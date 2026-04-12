@@ -25,12 +25,12 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:8000",
-        "https://stem-catalog.netlify.app",  # Старый домен (можно оставить)
+        "https://stem-catalog.netlify.app",
         "https://*.netlify.app",
-        "https://stem-catalog.vercel.app",   # ✅ Новый домен Vercel
-        "https://*.vercel.app",              # ✅ Все домены Vercel
+        "https://stem-catalog.vercel.app",
+        "https://*.vercel.app",
         "https://*.onrender.com",
-        "*",                                  # Для отладки
+        "*",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -65,7 +65,7 @@ class ChatMessage(BaseModel):
 # 📩 ФУНКЦИЯ ОТПРАВКИ В TELEGRAM
 # ==========================================
 
-async def send_to_telegram( dict):
+async def send_to_telegram(data: dict):
     """Отправляет уведомление о заявке в Telegram группу"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_GROUP_CHAT_ID:
         print("⚠️ Telegram настройки не заданы")
@@ -104,7 +104,7 @@ async def send_to_telegram( dict):
 # 🔵 ФУНКЦИЯ ОТПРАВКИ В BITRIX24
 # ==========================================
 
-async def send_to_bitrix( dict):
+async def send_to_bitrix(data: dict):
     """Отправляет заявку в Битрикс24 (создает Лид)"""
     if not BITRIX_WEBHOOK_URL:
         print("⚠️ Bitrix webhook URL not set")
@@ -204,13 +204,13 @@ async def ai_chat(request: Request):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.1-8b-instant",  # ✅ АКТУАЛЬНАЯ МОДЕЛЬ (вместо устаревшей llama3-8b-8192)
+                    "model": "llama-3.1-8b-instant",
                     "messages": [
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": user_message}
                     ],
-                    "temperature": 0.5,  # Баланс между креативностью и точностью
-                    "max_tokens": 300    # Ограничение длины ответа
+                    "temperature": 0.5,
+                    "max_tokens": 300
                 },
                 timeout=15.0
             )
