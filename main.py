@@ -29,6 +29,7 @@ app.add_middleware(
         "http://localhost:8000",
         "https://stem-catalog.netlify.app",
         "https://*.netlify.app",
+        "https://*.onrender.com",
     ],
 
     allow_credentials=True,
