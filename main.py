@@ -34,7 +34,7 @@ app.add_middleware(
         "https://*.workers.dev",                      # ✅ все workers.dev
         "https://*.onrender.com",
     ],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
