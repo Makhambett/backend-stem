@@ -21,7 +21,7 @@ BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("TELEGRAM_GROUP_CHAT_ID")
 
 # ✅ Bitrix24 Webhook
-BITRIX_WEBHOOK_URL = "https://b24-04nmm5.bitrix24.kz/rest/1/9lhydsst79uli1k1/"
+BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL")
 
 
 class ApplicationCreate(BaseModel):
