@@ -28,6 +28,7 @@ app.add_middleware(
         "http://localhost:5173",              # Для локальной разработки
         "http://localhost:8000",
         "https://stem-catalog.netlify.app",
+        "https://*.netlify.app",
     ],
 
     allow_credentials=True,
