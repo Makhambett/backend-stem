@@ -22,7 +22,14 @@ app = FastAPI(title="STEM Academia API")
 # ✅ 2. Настройки CORS (разрешаем запросы с фронтенда)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+       allow_origins=[
+        "https://ваш-сайт.netlify.app",      # Домен Netlify (будет позже)
+        "https://*.onrender.com",             # Все домены Render
+        "http://localhost:5173",              # Для локальной разработки
+        "http://localhost:8000",
+        "https://stem-catalog.netlify.app",
+    ],
+
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

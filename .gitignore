@@ -2,3 +2,15 @@ echo __pycache__/ > .gitignore
 echo .env >> .gitignore
 echo *.pyc >> .gitignore
 echo .venv/ >> .gitignore
+
+# Файлы с секретами — НИКОГДА не коммитить!
+.env
+*.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
