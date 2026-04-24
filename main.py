@@ -28,15 +28,12 @@ app.add_middleware(
         "http://localhost:8000",
         "https://stem-catalog.netlify.app",
         "https://stem-catalog.vercel.app",
-        "https://stem-catalog.tnysovm.workers.dev",  # ✅ твой домен
-        "https://*.netlify.app",
-        "https://*.vercel.app",
-        "https://*.workers.dev",                      # ✅ все workers.dev
-        "https://*.onrender.com",
+        "https://stem-catalog.tnysovm.workers.dev",
         "https://stem-catalog.pages.dev",
-        "https://frontend-stem.pages.dev",
+        "https://frontend-stem.pages.dev",  # ✅ Ваш новый домен
+        "https://*.onrender.com",
     ],
-    allow_credentials=False,
+    allow_credentials=True,  # ✅ ИСПРАВЛЕНО!
     allow_methods=["*"],
     allow_headers=["*"],
 )
