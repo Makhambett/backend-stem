@@ -32,6 +32,7 @@ app.add_middleware(
         "https://stem-catalog.pages.dev",
         "https://frontend-stem.pages.dev",  # ✅ Ваш новый домен
         "https://*.onrender.com",
+        "https://catalog-stem.pages.dev",
     ],
     allow_credentials=True,  # ✅ ИСПРАВЛЕНО!
     allow_methods=["*"],
