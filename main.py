@@ -34,6 +34,7 @@ app.add_middleware(
         "https://*.workers.dev",                      # ✅ все workers.dev
         "https://*.onrender.com",
         "https://stem-catalog.pages.dev",
+        "https://frontend-stem.pages.dev",
     ],
     allow_credentials=False,
     allow_methods=["*"],
