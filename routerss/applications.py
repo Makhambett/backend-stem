@@ -164,8 +164,9 @@ async def send_to_bitrix(data: dict) -> None:
         print("⚠️ Bitrix webhook URL не настроен")
         return
 
-    # ✅ Важно: URL должен заканчиваться на /, метод добавляется отдельно
-    url = f"{BITRIX_WEBHOOK_URL.rstrip('/')}crm.lead.add"
+    # ✅ ИСПРАВЛЕНО: гарантируем правильный URL со слэшем
+    webhook_base = BITRIX_WEBHOOK_URL.rstrip('/')
+    url = f"{webhook_base}/crm.lead.add"
     
     # ✅ Правильное форматирование COMMENTS с валидацией всех полей
     comments = (
