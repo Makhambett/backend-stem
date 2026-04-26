@@ -9,9 +9,7 @@ load_dotenv()
 router = APIRouter()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-
-# Модель img2img на Hugging Face (бесплатно)
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/lllyasviel/sd-controlnet-canny"
+HF_MODEL_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
 
 
 @router.post("/")
@@ -24,23 +22,23 @@ async def visualize_interior(request: Request):
     except Exception:
         raise HTTPException(status_code=400, detail="Невалидный JSON")
 
-    image_base64 = body.get("image")
     products_list = body.get("products", [])
-
-    if not image_base64:
-        raise HTTPException(status_code=422, detail="Поле 'image' обязательно")
 
     if not products_list:
         raise HTTPException(status_code=422, detail="Выберите хотя бы один товар")
 
     items_text = ", ".join(products_list)
     prompt = (
-        f"Modern educational interior with {items_text}. "
-        f"Photorealistic, bright, clean, high quality, 4K, interior design."
+        f"Modern educational classroom interior design with {items_text}. "
+        f"Photorealistic, bright natural lighting, clean walls, "
+        f"professional interior design, high quality, 4K."
     )
-    negative_prompt = "blurry, low quality, cartoon, ugly, deformed, dark, dirty"
+    negative_prompt = (
+        "blurry, low quality, cartoon, ugly, deformed, dark, dirty, "
+        "people, persons, text, watermark"
+    )
 
-    print(f"🎨 Визуализация запрос: {prompt}")
+    print(f"🎨 Промпт: {prompt}")
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -51,9 +49,8 @@ async def visualize_interior(request: Request):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "inputs": image_base64,
+                    "inputs": prompt,
                     "parameters": {
-                        "prompt": prompt,
                         "negative_prompt": negative_prompt,
                         "num_inference_steps": 20,
                         "guidance_scale": 7.5,
@@ -78,7 +75,7 @@ async def visualize_interior(request: Request):
                 return {"success": False, "error": "Ошибка генерации изображения"}
 
     except httpx.TimeoutException:
-        return {"success": False, "error": "Превышено время ожидания (60 сек). Попробуйте снова"}
+        return {"success": False, "error": "Превышено время ожидания. Попробуйте снова"}
     except Exception as e:
         print(f"❌ Visualize error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
