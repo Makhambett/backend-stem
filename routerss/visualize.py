@@ -9,7 +9,8 @@ load_dotenv()
 router = APIRouter()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
+# ✅ Новый правильный URL через Inference Providers
+HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell/v1/text-to-image"
 
 
 @router.post("/")
@@ -33,6 +34,10 @@ async def visualize_interior(request: Request):
         f"Photorealistic, bright natural lighting, clean walls, "
         f"professional interior design, high quality, 4K."
     )
+    negative_prompt = (
+        "blurry, low quality, cartoon, ugly, deformed, dark, dirty, "
+        "people, persons, text, watermark"
+    )
 
     print(f"🎨 Промпт: {prompt}")
 
@@ -46,6 +51,13 @@ async def visualize_interior(request: Request):
                 },
                 json={
                     "inputs": prompt,
+                    "parameters": {
+                        "negative_prompt": negative_prompt,
+                        "num_inference_steps": 4,   # FLUX schnell оптимален при 4 шагах
+                        "guidance_scale": 0.0,       # FLUX schnell требует 0.0
+                        "width": 1024,
+                        "height": 1024,
+                    },
                 },
             )
 
@@ -63,7 +75,7 @@ async def visualize_interior(request: Request):
                 }
             else:
                 print(f"❌ HF error {response.status_code}: {response.text}")
-                return {"success": False, "error": "Ошибка генерации изображения"}
+                return {"success": False, "error": f"Ошибка генерации: {response.status_code}"}
 
     except httpx.TimeoutException:
         return {"success": False, "error": "Превышено время ожидания. Попробуйте снова"}
