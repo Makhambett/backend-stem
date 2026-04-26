@@ -9,7 +9,6 @@ load_dotenv()
 router = APIRouter()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-# ✅ Новый правильный URL через Inference Providers
 HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell/v1/text-to-image"
 
 
@@ -48,13 +47,14 @@ async def visualize_interior(request: Request):
                 headers={
                     "Authorization": f"Bearer {HF_TOKEN}",
                     "Content-Type": "application/json",
+                    "Accept": "image/jpeg",
                 },
                 json={
                     "inputs": prompt,
                     "parameters": {
                         "negative_prompt": negative_prompt,
-                        "num_inference_steps": 4,   # FLUX schnell оптимален при 4 шагах
-                        "guidance_scale": 0.0,       # FLUX schnell требует 0.0
+                        "num_inference_steps": 4,
+                        "guidance_scale": 0.0,
                         "width": 1024,
                         "height": 1024,
                     },
