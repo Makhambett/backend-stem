@@ -9,7 +9,7 @@ load_dotenv()
 router = APIRouter()
 
 HF_TOKEN = os.getenv("HF_TOKEN")
-HF_MODEL_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+HF_MODEL_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell"
 
 
 @router.post("/")
@@ -33,10 +33,6 @@ async def visualize_interior(request: Request):
         f"Photorealistic, bright natural lighting, clean walls, "
         f"professional interior design, high quality, 4K."
     )
-    negative_prompt = (
-        "blurry, low quality, cartoon, ugly, deformed, dark, dirty, "
-        "people, persons, text, watermark"
-    )
 
     print(f"🎨 Промпт: {prompt}")
 
@@ -50,11 +46,6 @@ async def visualize_interior(request: Request):
                 },
                 json={
                     "inputs": prompt,
-                    "parameters": {
-                        "negative_prompt": negative_prompt,
-                        "num_inference_steps": 20,
-                        "guidance_scale": 7.5,
-                    },
                 },
             )
 
