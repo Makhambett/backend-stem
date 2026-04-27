@@ -17,7 +17,8 @@ from routerss import auth, categories, orders, products, applications, visualize
 # ✅ Создаем таблицы БД (если нет)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="STEM Academia API")
+#app = FastAPI(title="STEM Academia API")
+app = FastAPI(title="STEM Academia API", redirect_slashes=False)
 
 # ✅ Настройки CORS
 app.add_middleware(
