@@ -1,13 +1,13 @@
 from datetime import datetime
 import os
 import re
-from typing import Optional
+from typing import Optional, List, Union
 
 import httpx
 import models
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -21,26 +21,37 @@ router = APIRouter()
 # 🔧 НАСТРОЙКИ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
 # ==========================================
 
-# Telegram настройки
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GROUP_CHAT_ID = os.getenv("TELEGRAM_GROUP_CHAT_ID")
-
-# Bitrix24 Webhook
 BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL")
 
 
 # ==========================================
-# 📦 PYDANTIC МОДЕЛИ
+# 📦 PYDANTIC МОДЕЛИ (обновлено для корзины)
 # ==========================================
+
+class CartItem(BaseModel):
+    """Модель товара в корзине"""
+    name: str
+    article: Optional[str] = None
+    price: Optional[float] = None
+    quantity: Optional[int] = 1
+    url: Optional[str] = None
+
 
 class ApplicationCreate(BaseModel):
     name: str
     phone: str
     username: Optional[str] = None
     comment: Optional[str] = None
-    product_name: str
+    
+    # 🔹 Вариант 1: один товар (обратная совместимость)
+    product_name: Optional[str] = None
     article: Optional[str] = None
     product_url: Optional[str] = None
+    
+    # 🔹 Вариант 2: корзина с товарами
+    products: Optional[List[CartItem]] = None
 
     @field_validator('name')
     @classmethod
@@ -71,6 +82,13 @@ class ApplicationCreate(BaseModel):
             return v.replace("@", "").strip() or None
         return None
 
+    # 🔹 Валидация: либо один товар, либо список товаров
+    @model_validator(mode='after')
+    def check_products_or_product_name(self):
+        if not self.product_name and not self.products:
+            raise ValueError('Укажите либо product_name, либо products')
+        return self
+
 
 class TakeApplication(BaseModel):
     manager_id: int
@@ -98,7 +116,6 @@ def normalize_phone(phone: str) -> str:
 
 
 def status_label(status: str) -> str:
-    """Возвращает эмодзи-статус для заявки"""
     mapping = {
         "new": "🟡 Новая",
         "in_progress": "🟠 В работе",
@@ -106,6 +123,36 @@ def status_label(status: str) -> str:
         "rejected": "❌ Отклонена",
     }
     return mapping.get(status, status)
+
+
+def format_products_for_display(products: Optional[List[dict]]) -> tuple[str, str]:
+    """
+    Форматирует список товаров для отображения в Битрикс/Телеграм
+    
+    Returns:
+        tuple: (краткое название, подробный список)
+    """
+    if not products:
+        return "Не указан", "—"
+    
+    names = [p.get('name', 'Товар') for p in products if p.get('name')]
+    articles = [p.get('article') for p in products if p.get('article')]
+    
+    # Краткое название для заголовка
+    if len(names) == 1:
+        short_name = names[0]
+    elif len(names) <= 3:
+        short_name = ", ".join(names)
+    else:
+        short_name = f"{names[0]}, {names[1]} и ещё {len(names) - 2} товаров"
+    
+    # Подробный список для комментариев
+    if articles:
+        detailed = "\n".join([f"• {names[i]} (арт: {articles[i]})" for i in range(len(names))])
+    else:
+        detailed = "\n".join([f"• {name}" for name in names])
+    
+    return short_name, detailed
 
 
 def build_application_text(app) -> str:
@@ -129,7 +176,6 @@ def build_application_text(app) -> str:
 
 
 def build_take_keyboard(app_id: int) -> dict:
-    """Клавиатура для взятия заявки"""
     return {
         "inline_keyboard": [
             [{"text": "✋ Взять заявку", "callback_data": f"take:{app_id}"}]
@@ -138,7 +184,6 @@ def build_take_keyboard(app_id: int) -> dict:
 
 
 def build_action_keyboard(app_id: int) -> dict:
-    """Клавиатура для изменения статуса"""
     return {
         "inline_keyboard": [
             [
@@ -150,48 +195,45 @@ def build_action_keyboard(app_id: int) -> dict:
 
 
 # ==========================================
-# 📤 ОТПРАВКА В BITRIX24
+# 📤 ОТПРАВКА В BITRIX24 (обновлено для корзины)
 # ==========================================
 
 async def send_to_bitrix(data: dict) -> None:
-    """
-    Отправляет заявку в Битрикс24 (создает Лид)
-    
-    Args:
-        data: Словарь с данными заявки
-    """
+    """Отправляет заявку в Битрикс24 (создает Лид)"""
     if not BITRIX_WEBHOOK_URL:
         print("⚠️ Bitrix webhook URL не настроен")
         return
 
-    # ✅ ИСПРАВЛЕНО: гарантируем правильный URL со слэшем
     webhook_base = BITRIX_WEBHOOK_URL.rstrip('/')
     url = f"{webhook_base}/crm.lead.add"
     
-    # ✅ Правильное форматирование COMMENTS с валидацией всех полей
+    # 🔹 Форматируем товары (поддержка корзины)
+    product_display, product_detailed = format_products_for_display(data.get('products_list'))
+    
     comments = (
-        f"Товар: {data.get('product_name') or 'Не указан'}\n"
-        f"Артикул: {data.get('article') or '—'}\n"
-        f"Ссылка: {data.get('product_url') or '—'}\n"
-        f"Telegram: @{data.get('username') if data.get('username') else 'Не указан'}\n"
-        f"Комментарий: {data.get('comment') or '—'}\n"
-        f"ID заявки: {data.get('id', 'N/A')}"
+        f"📦 Товары ({data.get('items_count', 1)} шт.):\n{product_detailed}\n\n"
+        f"👤 Клиент: {data.get('name')}\n"
+        f"📞 Телефон: {data.get('phone')}\n"
+        f"🔗 Telegram: @{data.get('username') if data.get('username') else 'Не указан'}\n"
+        f"💬 Комментарий: {data.get('comment') or '—'}\n"
+        f"🆔 ID заявки: #{data.get('id', 'N/A')}\n"
+        f"🌐 Ссылка: {data.get('product_url') or '—'}"
     ).strip()
     
     payload = {
         "fields": {
-            "TITLE": f"Заявка с сайта: {data.get('product_name', 'Общий запрос')}",
+            "TITLE": f"Заявка с сайта: {product_display}",
             "NAME": data.get('name') or 'Не указано',
             "PHONE": [{"VALUE": data.get('phone') or '', "VALUE_TYPE": "WORK"}],
             "COMMENTS": comments,
             "SOURCE_ID": "WEB",
             "SOURCE_DESCRIPTION": "Сайт STEM Academia",
-            "OPENED": "Y"  # ✅ Важно: без этого лид может не создаться
+            "OPENED": "Y"
         }
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
+        async with httpx.AsyncClient(timeout=15) as client:
             response = await client.post(url, json=payload)
             
             if response.status_code == 200:
@@ -203,40 +245,31 @@ async def send_to_bitrix(data: dict) -> None:
             else:
                 print(f"❌ Битрикс24 HTTP {response.status_code}: {response.text}")
                 
-    except httpx.TimeoutException:
-        print("❌ Битрикс24: Таймаут соединения")
-    except httpx.RequestError as e:
-        print(f"❌ Битрикс24: Ошибка запроса: {e}")
     except Exception as e:
         print(f"❌ Ошибка отправки в Битрикс24: {type(e).__name__}: {e}")
 
 
 # ==========================================
-# 📤 ОТПРАВКА В TELEGRAM
+# 📤 ОТПРАВКА В TELEGRAM (обновлено для корзины)
 # ==========================================
 
 async def send_to_telegram(data: dict, app_id: int) -> None:
-    """
-    Отправляет уведомление в Telegram группу
-    
-    Args:
-        data: Словарь с данными заявки
-        app_id: ID заявки в базе данных
-    """
+    """Отправляет уведомление в Telegram группу"""
     if not BOT_TOKEN or not GROUP_CHAT_ID:
         print("⚠️ Telegram токен или chat_id не настроены")
         return
 
     username_line = f"🔗 <b>Username:</b> @{data.get('username')}\n" if data.get('username') else ""
     
+    # 🔹 Форматируем товары
+    product_display, product_detailed = format_products_for_display(data.get('products_list'))
+    
     text = (
         f"📥 <b>Новая заявка с сайта</b>\n\n"
         f"🆔 <b>ID:</b> #{app_id}\n"
         f"📌 <b>Статус:</b> 🟡 Новая\n"
         f"🕒 <b>Время:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"📦 <b>Товар:</b> {data.get('product_name')}\n"
-        f"🔖 <b>Артикул:</b> {data.get('article') or '—'}\n"
-        f"🌐 <b>Ссылка:</b> {data.get('product_url') or '—'}\n"
+        f"📦 <b>Товары ({data.get('items_count', 1)} шт.):</b>\n{product_detailed}\n\n"
         f"👤 <b>Имя:</b> {data.get('name')}\n"
         f"📞 <b>Телефон:</b> {data.get('phone')}\n"
         f"{username_line}"
@@ -260,10 +293,6 @@ async def send_to_telegram(data: dict, app_id: int) -> None:
             response.raise_for_status()
             print(f"📩 Telegram: Заявка #{app_id} отправлена")
             
-    except httpx.TimeoutException:
-        print("❌ Telegram: Таймаут соединения")
-    except httpx.HTTPStatusError as e:
-        print(f"❌ Telegram: HTTP ошибка {e.response.status_code}: {e.response.text}")
     except Exception as e:
         print(f"❌ Ошибка отправки в Telegram: {type(e).__name__}: {e}")
 
@@ -278,28 +307,51 @@ async def create_application(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
-    """
-    Создаёт новую заявку и отправляет уведомления в Telegram и Битрикс24
-    """
-    # ✅ Нормализация телефона (с обработкой ошибок)
+    """Создаёт новую заявку и отправляет уведомления"""
+    
+    # ✅ Нормализация телефона
     try:
         normalized_phone = normalize_phone(data.phone)
     except HTTPException as e:
         raise e
 
-    # ✅ Создаем запись в БД
-    db_app = models.Application(
-        name=data.name.strip(),
-        phone=normalized_phone,
-        username=data.username,  # ✅ Уже очищено валидатором
-        comment=data.comment.strip() if data.comment else None,
-        product_name=data.product_name.strip(),
-        article=data.article.strip() if data.article else None,
-        product_url=data.product_url.strip() if data.product_url else None,
-        status="new",
-        created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    )
+    # 🔹 Определяем, один товар или корзина
+    is_cart = bool(data.products)
+    
+    if is_cart:
+        # 🛒 Корзина: несколько товаров
+        product_display, product_detailed = format_products_for_display(
+            [p.model_dump() for p in data.products]
+        )
+        # Берем первую ссылку из корзины или пустую строку
+        first_url = next((p.url for p in data.products if p.url), None)
+        
+        db_app = models.Application(
+            name=data.name.strip(),
+            phone=normalized_phone,
+            username=data.username,
+            comment=data.comment.strip() if data.comment else None,
+            product_name=product_display,  # Краткое название для БД
+            article=", ".join([p.article for p in data.products if p.article]) or None,
+            product_url=first_url,
+            status="new",
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
+    else:
+        # 📦 Один товар (обратная совместимость)
+        db_app = models.Application(
+            name=data.name.strip(),
+            phone=normalized_phone,
+            username=data.username,
+            comment=data.comment.strip() if data.comment else None,
+            product_name=data.product_name.strip(),
+            article=data.article.strip() if data.article else None,
+            product_url=data.product_url.strip() if data.product_url else None,
+            status="new",
+            created_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        )
     
     db.add(db_app)
     db.commit()
@@ -316,6 +368,9 @@ async def create_application(
         "article": db_app.article,
         "product_url": db_app.product_url,
         "status": db_app.status,
+        # 🔹 Для корзины передаем список товаров
+        "products_list": [p.model_dump() for p in data.products] if is_cart else None,
+        "items_count": len(data.products) if is_cart else 1,
     }
 
     # ✅ Отправляем в Битрикс24 и Telegram (параллельно, в фоне)
@@ -325,7 +380,8 @@ async def create_application(
     return {
         "status": "ok", 
         "id": db_app.id, 
-        "normalized_phone": normalized_phone
+        "normalized_phone": normalized_phone,
+        "items_count": app_data["items_count"]
     }
 
 

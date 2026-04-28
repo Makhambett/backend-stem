@@ -58,9 +58,15 @@ class Application(Base):
     phone = Column(String, nullable=False)
     username = Column(String, nullable=True)
     comment = Column(Text, nullable=True)
-    product_name = Column(String, nullable=False)
+    
+    # 🔹 Для одного товара (обратная совместимость)
+    product_name = Column(String, nullable=True)  # ✅ Сделал nullable
     article = Column(String, nullable=True)
     product_url = Column(String, nullable=True)
+    
+    # 🔹 Для корзины: можно хранить JSON со списком товаров (опционально)
+    # products_data = Column(Text, nullable=True)  # JSON-строка с товарами
+    
     status = Column(String, default="new")
     manager_id = Column(Integer, nullable=True)
     manager_name = Column(String, nullable=True)
